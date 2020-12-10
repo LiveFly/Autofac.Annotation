@@ -30,6 +30,7 @@ using System.Linq;
 using System.Reflection;
 using Autofac.Builder;
 using Autofac.Core;
+using Autofac.Core.Resolving.Pipeline;
 using Autofac.Features.Scanning;
 using Castle.DynamicProxy;
 using Castle.DynamicProxy.Internal;
@@ -50,20 +51,7 @@ namespace Autofac.Annotation
 
         private static readonly ProxyGenerator ProxyGenerator = new ProxyGenerator();
 
-        /// <summary>
-        /// Enable class interception on the target type. Interceptors will be determined
-        /// via Intercept attributes on the class or added with InterceptedBy().
-        /// Only virtual methods can be intercepted this way.
-        /// </summary>
-        /// <typeparam name="TLimit">Registration limit type.</typeparam>
-        /// <typeparam name="TRegistrationStyle">Registration style.</typeparam>
-        /// <param name="registration">Registration to apply interception to.</param>
-        /// <returns>Registration builder allowing the registration to be configured.</returns>
-        public static IRegistrationBuilder<TLimit, ScanningActivatorData, TRegistrationStyle> EnableClassInterceptors<TLimit, TRegistrationStyle>(
-            this IRegistrationBuilder<TLimit, ScanningActivatorData, TRegistrationStyle> registration)
-        {
-            return EnableClassInterceptors(registration, ProxyGenerationOptions.Default);
-        }
+       
 
         /// <summary>
         /// Enable class interception on the target type. Interceptors will be determined
@@ -77,11 +65,26 @@ namespace Autofac.Annotation
         /// <returns>Registration builder allowing the registration to be configured.</returns>
         public static IRegistrationBuilder<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle> EnableClassInterceptors<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle>(
             this IRegistrationBuilder<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle> registration)
-            where TConcreteReflectionActivatorData : ConcreteReflectionActivatorData
+            where TConcreteReflectionActivatorData : ReflectionActivatorData
         {
             return EnableClassInterceptors(registration, ProxyGenerationOptions.Default);
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TLimit"></typeparam>
+        /// <typeparam name="TConcreteReflectionActivatorData"></typeparam>
+        /// <typeparam name="TRegistrationStyle"></typeparam>
+        /// <param name="registration"></param>
+        /// <param name="additionalInterfaces"></param>
+        /// <returns></returns>
+        public static IRegistrationBuilder<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle> EnableClassInterceptors<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle>(
+            this IRegistrationBuilder<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle> registration,params Type[] additionalInterfaces)
+            where TConcreteReflectionActivatorData : ReflectionActivatorData
+        {
+            return EnableClassInterceptors(registration, ProxyGenerationOptions.Default, additionalInterfaces);
+        }
         /// <summary>
         /// Enable class interception on the target type. Interceptors will be determined
         /// via Intercept attributes on the class or added with InterceptedBy().
@@ -123,7 +126,7 @@ namespace Autofac.Annotation
             this IRegistrationBuilder<TLimit, TConcreteReflectionActivatorData, TRegistrationStyle> registration,
             ProxyGenerationOptions options,
             params Type[] additionalInterfaces)
-            where TConcreteReflectionActivatorData : ConcreteReflectionActivatorData
+            where TConcreteReflectionActivatorData : ReflectionActivatorData
         {
             if (registration == null)
             {
@@ -201,10 +204,11 @@ namespace Autofac.Annotation
                 throw new ArgumentNullException(nameof(registration));
             }
 
-            registration.RegistrationData.ActivatingHandlers.Add((sender, e) =>
+            registration.ConfigurePipeline(p => p.Use(PipelinePhase.Activation, MiddlewareInsertionMode.StartOfPhase, (ctxt, next) =>
             {
-
-                var proxiedInterfaces = e.Instance
+                next(ctxt);
+                
+                var proxiedInterfaces = ctxt.Instance
                     .GetType()
                     .GetInterfaces()
                     .Where(ProxyUtil.IsAccessible)
@@ -214,20 +218,22 @@ namespace Autofac.Annotation
                 {
                     return;
                 }
-
+                
                 var theInterface = proxiedInterfaces.First();
                 var interfaces = proxiedInterfaces.Skip(1).ToArray();
 
-                var interceptors = GetInterceptorServices(e.Component, e.Instance.GetType())
-                    .Select(s => e.Context.ResolveService(s))
+                var interceptors = GetInterceptorServices(ctxt.Registration, ctxt.Instance.GetType())
+                    .Select(ctxt.ResolveService)
                     .Cast<IInterceptor>()
                     .ToArray();
 
-                e.Instance = options == null
-                    ? ProxyGenerator.CreateInterfaceProxyWithTarget(theInterface, interfaces, e.Instance, interceptors)
-                    : ProxyGenerator.CreateInterfaceProxyWithTarget(theInterface, interfaces, e.Instance, options, interceptors);
-            });
-
+                //这里需要改一下
+                //https://github.com/JSkimming/Castle.Core.AsyncInterceptor/blob/master/src/Castle.Core.AsyncInterceptor/ProxyGeneratorExtensions.cs
+                ctxt.Instance = options == null
+                    ? ProxyGenerator.CreateInterfaceProxyWithTarget(theInterface, interfaces, ctxt.Instance, interceptors)
+                    : ProxyGenerator.CreateInterfaceProxyWithTarget(theInterface, interfaces, ctxt.Instance, options, interceptors);
+            }));
+            
             return registration;
         }
 
@@ -260,27 +266,7 @@ namespace Autofac.Annotation
             return builder;
         }
 
-        /// <summary>
-        /// Allows a list of interceptor services to be assigned to the registration.
-        /// </summary>
-        /// <typeparam name="TLimit">Registration limit type.</typeparam>
-        /// <typeparam name="TActivatorData">Activator data type.</typeparam>
-        /// <typeparam name="TStyle">Registration style.</typeparam>
-        /// <param name="builder">Registration to apply interception to.</param>
-        /// <param name="interceptorServiceNames">The names of the interceptor services.</param>
-        /// <returns>Registration builder allowing the registration to be configured.</returns>
-        /// <exception cref="ArgumentNullException"><paramref name="builder"/> or <paramref name="interceptorServiceNames"/>.</exception>
-        public static IRegistrationBuilder<TLimit, TActivatorData, TStyle> InterceptedBy<TLimit, TActivatorData, TStyle>(
-            this IRegistrationBuilder<TLimit, TActivatorData, TStyle> builder,
-            params string[] interceptorServiceNames)
-        {
-            if (interceptorServiceNames == null || interceptorServiceNames.Any(n => n == null))
-            {
-                throw new ArgumentNullException(nameof(interceptorServiceNames));
-            }
-
-            return InterceptedBy(builder, interceptorServiceNames.Select(n => new KeyedService(n, typeof(IInterceptor))).ToArray());
-        }
+       
 
         /// <summary>
         /// Allows a list of interceptor services to be assigned to the registration.
@@ -365,5 +351,7 @@ namespace Autofac.Annotation
 
             return classAttributeServices.Concat(interfaceAttributeServices);
         }
+
+    
     }
 }

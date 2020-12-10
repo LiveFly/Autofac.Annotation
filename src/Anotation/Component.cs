@@ -9,7 +9,7 @@ namespace Autofac.Annotation
     /// 打在父类上子类没打的话子类就获取不到
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class Component : System.Attribute
+    public sealed class Component : System.Attribute
     {
         #region Constructor
         /// <summary>
@@ -65,10 +65,16 @@ namespace Autofac.Annotation
         /// 注册单个的key
         /// </summary>
         public string Key { get;}
+        
+        /// <summary>
+        /// 是否不允许被代理 比如Pointcut的类就不能被代理
+        /// </summary>
+        public bool NotUseProxy { get; set; }
+
 
         /// <summary>
-        /// 自定义注册顺序 越大越先注册 但是注意 相同的类型谁最小就会拿resolve谁
-        /// 注册同类型顺序越大越先注册但Resolve获取的是顺序越小的 和autofac本身是保持一致的
+        /// 自定义注册顺序 越小越先注册 但是注意 相同的类型谁最后注册就会拿resolve谁
+        /// 因为autofac是允许重复注册的  以最后一次注册为准
         /// </summary>
         public int OrderIndex { get; set; }
 
@@ -114,7 +120,12 @@ namespace Autofac.Annotation
         /// <summary>
         /// 拦截器类型
         /// </summary>
-        public InterceptorType InterceptorType { get; set; } = InterceptorType.Interface;
+        public InterceptorType InterceptorType { get; set; } = InterceptorType.Class;
+
+        /// <summary>
+        /// 开启拦截器代理
+        /// </summary>
+        public bool EnableAspect { get; set; }
 
         /// <summary>
         /// 如果同一个类型的拦截器有多个 可以指定Key
@@ -128,6 +139,7 @@ namespace Autofac.Annotation
         /// 被Release时执行的方法
         /// </summary>
         public string DestroyMethod { get; set; }
+       
 
     }
 
@@ -137,11 +149,11 @@ namespace Autofac.Annotation
     public enum InterceptorType
     {
         /// <summary>
-        /// 使用接口模式
+        /// 使用接口模式 自己指定拦截器
         /// </summary>
         Interface,
         /// <summary>
-        /// 使用class的虚方法模式
+        /// 使用class的虚方法模式 自己指定拦截器
         /// </summary>
         Class
     }

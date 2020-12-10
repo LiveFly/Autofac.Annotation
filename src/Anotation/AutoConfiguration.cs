@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,7 +12,7 @@ namespace Autofac.Annotation
     /// Bean标签在这个类里面才有作用
     /// </summary>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public class AutoConfiguration : System.Attribute
+    public sealed class AutoConfiguration : System.Attribute
     {
         /// <summary>
         /// 构造函数
@@ -49,6 +50,5 @@ namespace Autofac.Annotation
         public string Key { get; set; }
         public int OrderIndex { get; set; }
     }
-
 
 }

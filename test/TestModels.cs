@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Autofac.AspectIntercepter.Advice;
 using Autofac.Features.AttributeFilters;
 using Castle.DynamicProxy;
 
@@ -322,7 +324,7 @@ namespace Autofac.Annotation.Test
         string GetSchool();
     }
 
-    [Component(Interceptor = typeof(AsyncInterceptor))]
+    [Component(Interceptor = typeof(AsyncInterceptor),InterceptorType = InterceptorType.Interface)]
     public class A23:IA23
     {
         //public A23([Value("name")]string name)
@@ -349,7 +351,7 @@ namespace Autofac.Annotation.Test
         private string ttt;
     }
 
-    [Component(Interceptor = typeof(AsyncInterceptor),InterceptorType = InterceptorType.Class )]
+    [Component(Interceptor = typeof(AsyncInterceptor) )]
     public class A24
     {
         public A24([Value("name")]string name,[Autowired]A21 a21)
@@ -369,7 +371,7 @@ namespace Autofac.Annotation.Test
         public A21 A21 { get; set; }
     }
 
-    [Component(Interceptor = typeof(AsyncInterceptor),InterceptorType = InterceptorType.Class,InterceptorKey = "log2")]
+    [Component(Interceptor = typeof(AsyncInterceptor),InterceptorKey = "log2")]
     public class A25
     {
         //public A25([Value("name")]string name)
@@ -608,5 +610,300 @@ namespace Autofac.Annotation.Test
         
         [Autowired]
         public A37 A37 { get; set; }
+
+        public DateTime Now = DateTime.Now;
     }
+
+    [Component(AutofacScope = AutofacScope.SingleInstance)]
+    public class A39
+    {
+        public DateTime Now  = DateTime.Now;
+        
+        [Autowired]
+        public ObjectFactory<A38> A38 { get; set; }
+    }
+
+    [Component]
+    public class Model1
+    {
+        
+        public override string ToString()
+        {
+            return nameof(Model1);
+        }
+    }
+    
+    //泛型接口
+    public interface IMongodbHelp<T> where T : new()
+    {
+        string GetName();
+    }
+    
+    //泛型方法实现 https://github.com/yuzd/Autofac.Annotation/issues/13
+    [Component(typeof(IMongodbHelp<>),InitMethod = "InitMethod")]
+    public class MongodbHelp<T> : IMongodbHelp<T> where T : new()
+    {
+        [Autowired("A3612")]
+        public A36 A36 { get; set; }
+        
+        [Value("aaaaa")]
+        public string Test { get; set; }
+
+        public string Now { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        
+        public string GetName()
+        {
+            return (new T()).ToString();
+        }
+
+        public void InitMethod()
+        {
+            var aa = 1;
+            
+        }
+        
+    }
+    [Component(typeof(TestMongodb2<,>))]
+    public class TestMongodb2<T1, T2> 
+    {
+        [Autowired("A3612")]
+        public A36 A36 { get; set; }
+        
+        [Value("aaaaa")]
+        public string Test { get; set; }
+
+        public string Now { get; set; } = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        
+    }
+
+    public interface ITestAutowiredModal
+    {
+        
+    }
+    
+    [Component("abc")]
+    public class TestAutowiredModal1:ITestAutowiredModal
+    {
+        [Autowired("A3612")]
+        public A36 A36 { get; set; }
+        
+        [Value("aaaaa")]
+        public string Test { get; set; }
+
+    }
+    [Component("def")]
+    public class TestAutowiredModal2:ITestAutowiredModal
+    {
+        [Autowired("A3612")]
+        public A36 A36 { get; set; }
+        
+        [Value("aaaaa")]
+        public string Test { get; set; }
+       
+    }
+
+    [Component]
+    public class TestAutowiredModal3
+    {
+        [Autowired]
+        public ITestAutowiredModal abc { get; set; }
+        
+        [Autowired]
+        public ITestAutowiredModal def { get; set; }
+    }
+    
+    [Component(AutofacScope = AutofacScope.SingleInstance)]
+    public class TestAutowiredModal4
+    {
+        [Autowired]
+        public ObjectFactory<ITestAutowiredModal> abc { get; set; }
+        
+        [Autowired]
+        public ObjectFactory<ITestAutowiredModal> def { get; set; }
+    }
+
+    [Component]
+    public class TestLazyModel1
+    {
+        [Autowired]
+        public Lazy<TestAutowiredModal4> TestAutowiredModal4 { get; set; }
+        
+        [Autowired]
+        public TestAutowiredModal3 TestAutowiredModal3 { get; set; }
+    }
+    
+    [Component]
+    public class TestCircular1
+    {
+        [Autowired]
+        public TestCircular2 TestCircular2 { get; set; }
+    }
+    
+    [Component]
+    public class TestCircular2
+    {
+        [Autowired(CircularDependencies = true)]
+        public TestCircular1 TestCircular1 { get; set; }
+    }
+    
+    
+    [Component]
+    public class TestCircular3
+    {
+        [Autowired]
+        public TestCircular4 TestCircular4 { get; set; }
+    }
+    
+    [Component]
+    public class TestCircular4
+    {
+        [Autowired(CircularDependencies = false)]
+        public TestCircular3 TestCircular3 { get; set; }
+    }
+
+    [Component]
+    public class LazyModel1
+    {
+        [Autowired]
+        public Lazy<LazyModel2> LazyModel2 { get; set; }
+    }
+    
+    [Component]
+    public class LazyModel2
+    {
+        public string Name { get; set; } = "LazyModel2";
+    }
+    
+    
+    public class TestHelloBefore1:AspectBefore
+    {
+        public override Task Before(AspectContext aspectContext)
+        {
+            Console.WriteLine("TestHelloBefore1");
+            return Task.CompletedTask;
+        }
+    }
+    
+    public class TestHelloAfter1:AspectAfter
+    {
+        //这个 returnValue 如果目标方法正常返回的话 那就是目标方法的返回值
+        // 如果目标方法抛异常的话 那就是异常本身
+        public override Task After(AspectContext aspectContext,object returnValue)
+        {
+            Console.WriteLine("TestHelloAfter1");
+            return Task.CompletedTask;
+        }
+    }
+    
+    public class TestHelloAfterReturn1:AspectAfterReturn
+    {
+        //result 是目标方法的返回 (如果目标方法是void 则为null)
+        public override Task AfterReturn(AspectContext aspectContext, object result)
+        {
+            Console.WriteLine("TestHelloAfterReturn1");
+            return Task.CompletedTask;
+        }
+    }
+    
+    public class TestHelloAround1:AspectArround
+    {
+        public override async Task OnInvocation(AspectContext aspectContext, AspectDelegate _next)
+        {
+            Console.WriteLine("TestHelloAround1 start");
+            await _next(aspectContext);
+            Console.WriteLine("TestHelloAround1 end");
+        }
+    }
+    
+    public class TestHelloAfterThrows1:AspectAfterThrows
+    {
+       
+        public override Task AfterThrows(AspectContext aspectContext, Exception exception)
+        {
+            Console.WriteLine("TestHelloAfterThrows1");
+            return Task.CompletedTask;
+        }
+    }
+    
+    
+
+    //////////////////////////////////////////////
+    public class TestHelloBefore2:AspectBefore
+    {
+        public override Task Before(AspectContext aspectContext)
+        {
+            Console.WriteLine("TestHelloBefore2");
+            return Task.CompletedTask;
+        }
+    }
+    
+    public class TestHelloAfter2:AspectAfter
+    {
+        //这个 returnValue 如果目标方法正常返回的话 那就是目标方法的返回值
+        // 如果目标方法抛异常的话 那就是异常本身
+        public override Task After(AspectContext aspectContext,object returnValue)
+        {
+            Console.WriteLine("TestHelloAfter2");
+            return Task.CompletedTask;
+        }
+    }
+    
+    public class TestHelloAfterReturn2:AspectAfterReturn
+    {
+        //result 是目标方法的返回 (如果目标方法是void 则为null)
+        public override Task AfterReturn(AspectContext aspectContext, object result)
+        {
+            Console.WriteLine("TestHelloAfterReturn2");
+            return Task.CompletedTask;
+        }
+    }
+    
+    public class TestHelloAround2:AspectArround
+    {
+        public override async Task OnInvocation(AspectContext aspectContext, AspectDelegate _next)
+        {
+            Console.WriteLine("TestHelloAround2 start");
+            await _next(aspectContext);
+            Console.WriteLine("TestHelloAround2 end");
+        }
+    }
+    
+    public class TestHelloAfterThrows2:AspectAfterThrows
+    {
+       
+        public override Task AfterThrows(AspectContext aspectContext, Exception exception)
+        {
+            Console.WriteLine("TestHelloAfterThrows2");
+            return Task.CompletedTask;
+        }
+    }
+    
+    [Component(EnableAspect = true)]
+    public class TestHello
+    {
+
+        [
+            TestHelloAround1(GroupName = "Aspect1",OrderIndex = 10),
+            TestHelloBefore1(GroupName = "Aspect1",OrderIndex = 10),
+            TestHelloAfter1(GroupName = "Aspect1",OrderIndex = 10),
+            TestHelloAfterReturn1(GroupName = "Aspect1",OrderIndex = 10),
+            TestHelloAfterThrows1(GroupName = "Aspect1",OrderIndex = 10)
+        ]
+        [
+            TestHelloAround2(GroupName = "Aspect2",OrderIndex = 1),
+            TestHelloBefore2(GroupName = "Aspect2",OrderIndex = 1),
+            TestHelloAfter2(GroupName = "Aspect2",OrderIndex = 1),
+            TestHelloAfterReturn2(GroupName = "Aspect2",OrderIndex = 1),
+            TestHelloAfterThrows2(GroupName = "Aspect2",OrderIndex = 1)
+        ]
+        public virtual void SayGroup()
+        {
+            Console.WriteLine("Say");
+            throw new ArgumentException("exception");
+        }
+    }
+    
+    
+    
+    
 }

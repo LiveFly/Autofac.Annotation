@@ -7,21 +7,23 @@ namespace Autofac.Annotation.Test
     [Component]
     public class Log : AsyncInterceptor
     {
-        protected override async Task InterceptAsync(IInvocation invocation, Func<IInvocation, Task> proceed)
+
+        protected override void Intercept(IInvocation invocation)
         {
-            await proceed(invocation).ConfigureAwait(false);
+            invocation.Proceed();
+            if (invocation.ReturnValue is string)
+            {
+                invocation.ReturnValue = "a";
+            }
         }
 
-        protected override async Task<TResult> InterceptAsync<TResult>(IInvocation invocation, Func<IInvocation, Task<TResult>> proceed)
+        protected override async ValueTask InterceptAsync(IAsyncInvocation invocation)
         {
-            TResult result = await proceed(invocation).ConfigureAwait(false);
-            if (result is string)
+            await invocation.ProceedAsync();
+            if (invocation.Result is string)
             {
-                var tt =  (TResult) Activator.CreateInstance(typeof(String),new char[]{'a'});
-                invocation.ReturnValue = tt;
-                return tt;
+                invocation.Result = "a";
             }
-            return result;
         }
     }
 
@@ -34,21 +36,22 @@ namespace Autofac.Annotation.Test
         //[Autowired]
         public A21 A21 { get; set; }
 
-        protected override async Task InterceptAsync(IInvocation invocation, Func<IInvocation, Task> proceed)
+        protected override void Intercept(IInvocation invocation)
         {
-            await proceed(invocation).ConfigureAwait(false);
+            invocation.Proceed();
+            if (invocation.ReturnValue is string)
+            {
+                invocation.ReturnValue = "b";
+            }
         }
 
-        protected override async Task<TResult> InterceptAsync<TResult>(IInvocation invocation, Func<IInvocation, Task<TResult>> proceed)
+        protected override async ValueTask InterceptAsync(IAsyncInvocation invocation)
         {
-            TResult result = await proceed(invocation).ConfigureAwait(false);
-            if (result is string)
+            await invocation.ProceedAsync();
+            if (invocation.Result is string)
             {
-                var tt =  (TResult) Activator.CreateInstance(typeof(String),new char[]{'b'});
-                invocation.ReturnValue = tt;
-                return tt;
+                invocation.Result = "b";
             }
-            return result;
         }
     }
 }

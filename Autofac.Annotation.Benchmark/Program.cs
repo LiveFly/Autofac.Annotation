@@ -17,7 +17,7 @@ namespace Autofac.Annotation.Benchmark
             //autowiredTest2.Autofac();
 
             BenchmarkRunner.Run<AutofacAutowiredResolveBenchmark>();
-            BenchmarkRunner.Run<AutowiredResolveBenchmark>();
+            //BenchmarkRunner.Run<AutowiredResolveBenchmark>();
            
         }
     }

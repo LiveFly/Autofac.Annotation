@@ -17,7 +17,7 @@ namespace Autofac.Annotation
     /// 只能打一个标签 可以继承父类
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-    public class Value : ParameterFilterAttribute
+    public sealed class Value : ParameterFilterAttribute
     {
         /// <summary>
         /// The default placeholder prefix.
@@ -63,7 +63,18 @@ namespace Autofac.Annotation
         /// <returns></returns>
         public override object ResolveParameter(ParameterInfo parameter, IComponentContext context)
         {
-            return parameter == null ? null : Resolve(context, parameter.Member.DeclaringType, parameter.ParameterType, null, parameter);
+            return parameter == null ? null : Resolve(context, parameter.Member.DeclaringType, parameter.ParameterType, parameter.Name);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="parameter"></param>
+        /// <param name="context"></param>
+        /// <returns></returns>
+        public override bool CanResolveParameter(ParameterInfo parameter, IComponentContext context)
+        {
+            return true;
         }
 
         /// <summary>
@@ -75,7 +86,7 @@ namespace Autofac.Annotation
         /// <returns></returns>
         internal object ResolveParameterWithConfiguration(AutoConfigurationDetail detail, ParameterInfo parameter, IComponentContext context)
         {
-            return Resolve(context, parameter.Member.DeclaringType, parameter.ParameterType, null, parameter, detail);
+            return Resolve(context, parameter.Member.DeclaringType, parameter.ParameterType, parameter.Name, detail);
         }
 
         /// <summary>
@@ -86,7 +97,7 @@ namespace Autofac.Annotation
         /// <returns></returns>
         public object ResolveProperty(PropertyInfo parameter, IComponentContext context)
         {
-            return parameter == null ? null : Resolve(context, parameter.DeclaringType, parameter.PropertyType, parameter);
+            return parameter == null ? null : Resolve(context, parameter.DeclaringType, parameter.PropertyType);
         }
 
         /// <summary>
@@ -97,7 +108,7 @@ namespace Autofac.Annotation
         /// <returns></returns>
         public object ResolveFiled(FieldInfo parameter, IComponentContext context)
         {
-            return parameter == null ? null : Resolve(context, parameter.DeclaringType, parameter.FieldType, parameter);
+            return parameter == null ? null : Resolve(context, parameter.DeclaringType, parameter.FieldType);
         }
 
         /// <summary>
@@ -106,17 +117,21 @@ namespace Autofac.Annotation
         /// <param name="context"></param>
         /// <param name="classType"></param>
         /// <param name="memberType"></param>
-        /// <param name="memberInfo"></param>
         /// <param name="parameterInfo"></param>
         /// <param name="autoConfigurationDetail"></param>
         /// <returns></returns>
-        private object Resolve(IComponentContext context, Type classType, Type memberType, MemberInfo memberInfo, ParameterInfo parameterInfo = null,
-            AutoConfigurationDetail autoConfigurationDetail = null)
+        internal object Resolve(IComponentContext context, Type classType, Type memberType, string parameterInfo = null, AutoConfigurationDetail autoConfigurationDetail = null)
         {
             if (classType == null) return null;
             if (string.IsNullOrEmpty(this.value)) return null;
             try
             {
+                //判断类型是否是IValue
+                if ((typeof(IObjectFactory).IsAssignableFrom(memberType)))
+                {
+                    return context.Resolve<ObjectBeanFactory>().CreateValueFactory(this,memberType, classType, parameterInfo, autoConfigurationDetail);
+                }
+                
                 //先把 ${} 的 placehoder 全部替换掉
                 var parameterValue = ResolveEmbeddedValue(context, classType, this.value, autoConfigurationDetail);
                 int startIndex = parameterValue.ToString().IndexOf("#{", StringComparison.Ordinal);
@@ -162,15 +177,11 @@ namespace Autofac.Annotation
 
                 return TypeConversionUtils.ConvertValueIfNecessary(memberType, parameterValue, null);
 
-                //var parseValue = parameterInfo == null
-                //    ? TypeManipulation.ChangeToCompatibleType(parameterValue, memberType, memberInfo)
-                //    : TypeManipulation.ChangeToCompatibleType(parameterValue, memberType, parameterInfo);
-                //return parseValue;
             }
             catch (Exception ex)
             {
                 throw new DependencyResolutionException($"Value set error,can not resolve class type:{classType.FullName} =====>" +
-                                                        $" {(parameterInfo == null ? memberType.Name : parameterInfo.Name)} "
+                                                        $" {parameterInfo ?? memberType.Name} "
                                                         + (!string.IsNullOrEmpty(this.value) ? $",with value:[{this.value}]" : ""), ex);
             }
         }
@@ -266,4 +277,6 @@ namespace Autofac.Annotation
             return propertyValue;
         }
     }
+
+    
 }

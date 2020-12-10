@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using Autofac.Annotation;
 using Autofac.Configuration.Test.test3;
 using Xunit;
@@ -54,8 +55,36 @@ namespace Autofac.Configuration.Test.test4
 
             var a1 = ioc.Resolve<ValueModel5>();
 
+            var ss = a1.ParentName;
+            Thread.Sleep(10000);
+            
             Assert.Equal("yuzd", a1.ParentName);
+            
+        }
+        
+        
+        [Fact]
+        public void Test_Type_04()
+        {
+            var builder = new ContainerBuilder();
 
+            // autofac打标签模式
+            builder.RegisterModule(new AutofacAnnotationModule(typeof(ValueTest).Assembly));
+
+            var ioc = builder.Build();
+
+            var a1 = ioc.Resolve<ValueModel6>();
+
+            var ss = a1.ParentName.Value;
+            var sss = a1.GetTest();
+            
+            Assert.NotEmpty(ss);
+            
+            Thread.Sleep(10000);
+            
+            var ss2 =a1.ParentName.Value;
+            var sss2 = a1.GetTest();
+            Assert.NotEmpty(ss2);
         }
     }
 }
